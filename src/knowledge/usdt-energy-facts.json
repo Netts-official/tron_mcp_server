@@ -1,0 +1,35 @@
+{
+  "usdt_transfer_energy": {
+    "contract": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+    "decimals": 6,
+    "energy_costs": {
+      "to_address_with_usdt": {
+        "energy": 64285,
+        "description": "Отправка USDT на адрес, где уже есть USDT токены"
+      },
+      "to_address_without_usdt": {
+        "energy": 130285,
+        "description": "Отправка USDT на адрес, где еще нет USDT токенов (первая отправка)"
+      },
+      "difference": {
+        "energy": 66000,
+        "multiplier": 2.03,
+        "description": "Первая отправка требует в 2 раза больше энергии"
+      }
+    },
+    "cost_in_trx": {
+      "energy_price_sun": 420,
+      "to_address_with_usdt": 26.999700,
+      "to_address_without_usdt": 54.719700,
+      "note": "При текущей цене 420 SUN за единицу энергии"
+    },
+    "test_addresses": {
+      "from": "TTi1GbniVgqxoz5EaWTsr9T3DgAyVpsJnH",
+      "to_with_usdt": "TSLbRevWFn3hktZmfDrzRbDLfEA6RQjNwK",
+      "to_without_usdt": "TF4RsPpv6yz2MU4EUZwoHND3p4S3kR3PWd",
+      "test_amount": 0.001
+    },
+    "last_verified": "2025-07-18",
+    "source": "netts.io production testing"
+  }
+}
