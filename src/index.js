@@ -1068,22 +1068,109 @@ class TronMcpServer {
 
   async getEnergyPrices() {
     try {
-      const prices = await this.tronScanAPI.getEnergyPrices();
-      
+      // Use executeWithFallback for smart fallback behavior
+      const result = await this.executeWithFallback({
+        tronweb: async () => {
+          // Get chain parameters from TronWeb node
+          const chainParams = await this.tronWeb.trx.getChainParameters();
+          return this.processChainParametersForEnergyPrices(chainParams);
+        },
+        trongrid: async () => {
+          // Get chain parameters from TronGrid API
+          const response = await fetch('https://api.trongrid.io/wallet/getchainparameters', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'TRON-PRO-API-KEY': process.env.TRONGRID_API_KEY || ''
+            },
+            body: JSON.stringify({})
+          });
+          
+          if (!response.ok) {
+            throw new Error(`TronGrid API error: ${response.status} ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          return this.processChainParametersForEnergyPrices(data.chainParameter || []);
+        },
+        tronscan: async () => {
+          // Original TronScan API call
+          const prices = await this.tronScanAPI.getEnergyPrices();
+          return prices;
+        }
+      }, 'getEnergyPrices');
+
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(prices, null, 2),
+            text: JSON.stringify(result, null, 2),
           },
         ],
       };
     } catch (error) {
-      throw new McpError(
-        ErrorCode.InternalError,
-        `Failed to get energy prices: ${error.message}`
-      );
+      // Last resort: return static energy prices based on known values
+      console.error('All energy price sources failed, using fallback values:', error.message);
+      
+      const fallbackPrices = {
+        energy_price_sun: 420, // 420 SUN per energy unit (typical value)
+        bandwidth_price_sun: 1000, // 1000 SUN per bandwidth unit
+        create_account_fee: 100000, // 0.1 TRX in SUN
+        transaction_fee: 1000, // 0.001 TRX in SUN
+        witness_create_fee: 9999000000, // 9999 TRX in SUN
+        asset_issue_fee: 1024000000, // 1024 TRX in SUN
+        last_updated: new Date().toISOString(),
+        source: 'fallback_static_values',
+        note: 'All API sources failed, using static fallback values'
+      };
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(fallbackPrices, null, 2),
+          },
+        ],
+      };
     }
+  }
+
+  // Helper function to process chain parameters and extract energy pricing info
+  processChainParametersForEnergyPrices(chainParams) {
+    const params = Array.isArray(chainParams) ? chainParams : chainParams.chainParameter || [];
+    
+    const result = {
+      source: 'chain_parameters',
+      last_updated: new Date().toISOString(),
+      raw_parameters: {}
+    };
+
+    // Extract key parameters
+    params.forEach(param => {
+      if (param.key && param.value !== undefined) {
+        result.raw_parameters[param.key] = param.value;
+      }
+    });
+
+    // Calculate energy prices from chain parameters
+    const energyFee = result.raw_parameters.getEnergyFee || 420; // Default 420 SUN
+    const transactionFee = result.raw_parameters.getTransactionFee || 1000; // Default 1000 SUN
+    const createAccountFee = result.raw_parameters.getCreateAccountFee || 100000; // Default 0.1 TRX
+    
+    result.energy_price_sun = energyFee;
+    result.bandwidth_price_sun = transactionFee;
+    result.create_account_fee = createAccountFee;
+    result.transaction_fee = transactionFee;
+
+    // Add additional useful parameters
+    if (result.raw_parameters.getAccountUpgradeCost) {
+      result.witness_create_fee = result.raw_parameters.getAccountUpgradeCost;
+    }
+    if (result.raw_parameters.getAssetIssueFee) {
+      result.asset_issue_fee = result.raw_parameters.getAssetIssueFee;
+    }
+
+    return result;
   }
 
   async getJavaTronReadme() {
