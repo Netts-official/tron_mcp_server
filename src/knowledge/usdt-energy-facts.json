@@ -18,10 +18,10 @@
       }
     },
     "cost_in_trx": {
-      "energy_price_sun": 420,
-      "to_address_with_usdt": 26.999700,
-      "to_address_without_usdt": 54.719700,
-      "note": "При текущей цене 420 SUN за единицу энергии"
+      "energy_price_sun": 210,
+      "to_address_with_usdt": 13.679925,
+      "to_address_without_usdt": 27.35985,
+      "note": "При текущей цене 210 SUN за единицу энергии"
     },
     "test_addresses": {
       "from": "TTi1GbniVgqxoz5EaWTsr9T3DgAyVpsJnH",

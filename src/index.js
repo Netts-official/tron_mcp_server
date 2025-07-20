@@ -20,6 +20,7 @@ import { EnergyEstimator } from './energy-estimator.js';
 
 import { MarketModule } from './modules/market/index.js';
 import { AccountModule } from './modules/account/index.js';
+import { BlockchainModule } from './modules/blockchain/index.js';
 console.error('[TRON-MCP] Imports completed');
 dotenv.config();
 console.error('[TRON-MCP] Environment loaded');
@@ -58,6 +59,9 @@ class TronMcpServer {
       this.marketModule = new MarketModule(this.priceTracker);
       
       this.accountModule = new AccountModule(this.tronWeb, this.trongridApiCall.bind(this), this.tronscanApiCall.bind(this), this.executeWithFallback.bind(this));
+      
+      this.blockchainModule = new BlockchainModule(this.tronWeb, this.trongridApiCall.bind(this), this.tronscanApiCall.bind(this), this.tronScanAPI);
+      console.error('[TRON-MCP] Blockchain module initialized');
       console.error('[TRON-MCP] Account module initialized');
       console.error('[TRON-MCP] Market module initialized');
       console.error('[TRON-MCP] Price tracker initialized');
@@ -605,11 +609,11 @@ class TronMcpServer {
           case 'send_trx':
             return await this.accountModule.sendTrx(args);
           case 'get_transaction':
-            return await this.getTransaction(args);
+            return await this.blockchainModule.getTransaction(args);
           case 'get_block':
-            return await this.getBlock(args);
+            return await this.blockchainModule.getBlock(args);
           case 'get_current_block_number':
-            return await this.getCurrentBlockNumber(args);
+            return await this.blockchainModule.getCurrentBlockNumber(args);
           case 'contract_call':
             return await this.contractCall(args);
           case 'estimate_energy':
@@ -681,257 +685,6 @@ class TronMcpServer {
     });
   }
 
-
-  async getTransaction({ txHash }) {
-    try {
-      // Try TronWeb (local node) first
-      try {
-        const transaction = await this.tronWeb.trx.getTransaction(txHash);
-        const transactionInfo = await this.tronWeb.trx.getTransactionInfo(txHash);
-        
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                transaction,
-                info: transactionInfo,
-                source: 'tronweb_node'
-              }, null, 2),
-            },
-          ],
-        };
-      } catch (nodeError) {
-        console.error('TronWeb failed, trying TronGrid API:', nodeError.message);
-        
-        // Fallback to TronGrid API
-        try {
-          const transactionResult = await this.trongridApiCall({ 
-            endpoint: '/wallet/gettransactionbyid', 
-            method: 'POST', 
-            data: { value: txHash }
-          });
-          
-          const infoResult = await this.trongridApiCall({ 
-            endpoint: '/wallet/gettransactioninfobyid', 
-            method: 'POST', 
-            data: { value: txHash }
-          });
-          
-          const transaction = JSON.parse(transactionResult.content[0].text).result;
-          const info = JSON.parse(infoResult.content[0].text).result;
-          
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify({
-                  transaction,
-                  info,
-                  source: 'trongrid_api'
-                }, null, 2),
-              },
-            ],
-          };
-        } catch (trongridError) {
-          console.error('TronGrid failed, trying TronScan API:', trongridError.message);
-          
-          // Fallback to TronScan
-          try {
-            const result = await this.tronscanApiCall({ 
-              endpoint: '/api/transaction-info', 
-              params: { hash: txHash }
-            });
-            
-            const txData = JSON.parse(result.content[0].text).result;
-            
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify({
-                    transaction: txData,
-                    info: txData, // TronScan combines both
-                    source: 'tronscan_api'
-                  }, null, 2),
-                },
-              ],
-            };
-          } catch (tronscanError) {
-            throw new Error(`All sources failed: ${nodeError.message}, ${trongridError.message}, ${tronscanError.message}`);
-          }
-        }
-      }
-    } catch (error) {
-      throw new McpError(
-        ErrorCode.InternalError,
-        `Failed to get transaction: ${error.message}`
-      );
-    }
-  }
-
-  async getBlock({ blockNumber }) {
-    try {
-      // First try to get from local node
-      try {
-        const block = blockNumber 
-          ? await this.tronWeb.trx.getBlock(blockNumber)
-          : await this.tronWeb.trx.getCurrentBlock();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(block, null, 2),
-            },
-          ],
-        };
-      } catch (nodeError) {
-        console.error('Local node failed, trying TronGrid API:', nodeError.message);
-        
-        // Fallback to TronGrid API
-        const tronGridUrl = 'https://api.trongrid.io';
-        const endpoint = blockNumber ? `/wallet/getblockbynum` : `/wallet/getnowblock`;
-        const body = blockNumber ? { num: blockNumber } : {};
-        
-        const response = await fetch(`${tronGridUrl}${endpoint}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'TRON-PRO-API-KEY': process.env.API_TRONGRID || ''
-          },
-          body: JSON.stringify(body)
-        });
-        
-        if (!response.ok) {
-          throw new Error(`TronGrid API error: ${response.status} ${response.statusText}`);
-        }
-        
-        const block = await response.json();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(block, null, 2),
-            },
-          ],
-        };
-      }
-    } catch (error) {
-      // Last fallback: try TronScan API
-      try {
-        const block = blockNumber 
-          ? await this.tronScanAPI.getBlock(blockNumber)
-          : await this.tronScanAPI.getCurrentBlock();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(block, null, 2),
-            },
-          ],
-        };
-      } catch (scanError) {
-        throw new McpError(
-          ErrorCode.InternalError,
-          `Failed to get block from all sources: ${error.message}`
-        );
-      }
-    }
-  }
-
-  async getCurrentBlockNumber() {
-    try {
-      // Try TronWeb first
-      try {
-        const block = await this.tronWeb.trx.getCurrentBlock();
-        const blockNumber = block.block_header.raw_data.number;
-        
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                current_block_number: blockNumber,
-                timestamp: new Date().toISOString(),
-                source: 'tronweb'
-              }, null, 2),
-            },
-          ],
-        };
-      } catch (nodeError) {
-        console.error('TronWeb failed, trying TronGrid API:', nodeError.message);
-        
-        // Fallback to TronGrid API
-        const tronGridUrl = process.env.FULL_NODE_URL || 'https://api.trongrid.io';
-        const headers = {
-          'Content-Type': 'application/json',
-        };
-        
-        // Add API key if available
-        if (process.env.TRONGRID_API_KEY) {
-          headers['TRON-PRO-API-KEY'] = process.env.TRONGRID_API_KEY;
-        }
-        
-        const response = await fetch(`${tronGridUrl}/wallet/getnowblock`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({})
-        });
-        
-        if (!response.ok) {
-          throw new Error(`TronGrid API error: ${response.status} ${response.statusText}`);
-        }
-        
-        const block = await response.json();
-        const blockNumber = block.block_header?.raw_data?.number;
-        
-        if (!blockNumber) {
-          throw new Error('Unable to extract block number from response');
-        }
-        
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                current_block_number: blockNumber,
-                timestamp: new Date().toISOString(),
-                source: 'trongrid_api'
-              }, null, 2),
-            },
-          ],
-        };
-      }
-    } catch (error) {
-      // Last fallback: try TronScan API
-      try {
-        const block = await this.tronScanAPI.getCurrentBlock();
-        const blockNumber = block.number || block.block_header?.raw_data?.number;
-        
-        if (!blockNumber) {
-          throw new Error('Unable to extract block number from TronScan response');
-        }
-        
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                current_block_number: blockNumber,
-                timestamp: new Date().toISOString(),
-                source: 'tronscan_api'
-              }, null, 2),
-            },
-          ],
-        };
-      } catch (scanError) {
-        throw new McpError(
-          ErrorCode.InternalError,
-          `Failed to get current block number from all sources: ${error.message}`
-        );
-      }
-    }
-  }
 
   async contractCall({ contractAddress, functionName, parameters = [], feeLimit }) {
     try {
