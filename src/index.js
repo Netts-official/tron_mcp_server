@@ -1113,7 +1113,7 @@ class TronMcpServer {
       console.error('All energy price sources failed, using fallback values:', error.message);
       
       const fallbackPrices = {
-        energy_price_sun: 420, // 420 SUN per energy unit (typical value)
+        energy_price_sun: 210, // 210 SUN per energy unit (current network value)
         bandwidth_price_sun: 1000, // 1000 SUN per bandwidth unit
         create_account_fee: 100000, // 0.1 TRX in SUN
         transaction_fee: 1000, // 0.001 TRX in SUN
@@ -1153,7 +1153,7 @@ class TronMcpServer {
     });
 
     // Calculate energy prices from chain parameters
-    const energyFee = result.raw_parameters.getEnergyFee || 420; // Default 420 SUN
+    const energyFee = result.raw_parameters.getEnergyFee || 210; // Default 210 SUN (current network value)
     const transactionFee = result.raw_parameters.getTransactionFee || 1000; // Default 1000 SUN
     const createAccountFee = result.raw_parameters.getCreateAccountFee || 100000; // Default 0.1 TRX
     
