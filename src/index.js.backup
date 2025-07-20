@@ -18,7 +18,6 @@ import { PriceTracker } from './price-tracker.js';
 import { NetworkMonitor } from './network-monitor.js';
 import { EnergyEstimator } from './energy-estimator.js';
 
-import { MarketModule } from './modules/market/index.js';
 console.error('[TRON-MCP] Imports completed');
 dotenv.config();
 console.error('[TRON-MCP] Environment loaded');
@@ -53,9 +52,6 @@ class TronMcpServer {
       console.error('[TRON-MCP] TronScan API initialized');
       
       this.priceTracker = new PriceTracker();
-      
-      this.marketModule = new MarketModule(this.priceTracker);
-      console.error('[TRON-MCP] Market module initialized');
       console.error('[TRON-MCP] Price tracker initialized');
       
       this.networkMonitor = null;
@@ -617,9 +613,9 @@ class TronMcpServer {
           case 'get_tron_reference':
             return await this.getTronReference(args);
           case 'get_trx_price':
-            return await this.marketModule.getTRXPrice();
+            return await this.getTRXPrice(args);
           case 'get_trx_market_data':
-            return await this.marketModule.getTRXMarketData();
+            return await this.getTRXMarketData(args);
           case 'get_network_statistics':
             return await this.getNetworkStatistics(args);
           case 'get_energy_consumption':
@@ -1385,6 +1381,45 @@ class TronMcpServer {
     }
   }
 
+  async getTRXPrice() {
+    try {
+      const priceData = await this.priceTracker.getTRXPrice();
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(priceData, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to get TRX price: ${error.message}`
+      );
+    }
+  }
+
+  async getTRXMarketData() {
+    try {
+      const marketData = await this.priceTracker.getTRXMarketData();
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(marketData, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to get TRX market data: ${error.message}`
+      );
+    }
+  }
 
   async getNetworkStatistics() {
     try {
