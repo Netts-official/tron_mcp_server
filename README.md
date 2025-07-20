@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/netts-official-tron-mcp-server-badge.png)](https://mseep.ai/app/netts-official-tron-mcp-server)
+
 # TRON MCP Server
 
 A Model Context Protocol (MCP) server that provides seamless integration with the TRON blockchain, enabling AI assistants like Claude to interact with TRON network features including balance checking, transaction management, smart contract interaction, and real-time blockchain data.
