@@ -184,13 +184,33 @@ class TronMcpServer {
         },
         {
           name: 'get_block',
-          description: 'Get block information',
+          description: 'Get block information with smart size management to prevent token overflow',
           inputSchema: {
             type: 'object',
             properties: {
               blockNumber: {
                 type: 'number',
                 description: 'Block number (optional, returns latest if not provided)',
+              },
+              summary: {
+                type: 'boolean',
+                description: 'Return summary only without full transaction data (default: true)',
+              },
+              includeTransactions: {
+                type: 'boolean',
+                description: 'Include transactions in response (default: false)',
+              },
+              transactionLimit: {
+                type: 'number',
+                description: 'Maximum number of transactions to include (default: 10)',
+              },
+              saveToFile: {
+                type: 'boolean',
+                description: 'Save full block data to file and return file path (default: false)',
+              },
+              fullResponse: {
+                type: 'boolean',
+                description: 'Return full block data without limits - WARNING: may exceed token limit (default: false)',
               },
             },
           },
